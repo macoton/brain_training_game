@@ -191,6 +191,9 @@
         let isGoogleDriveAuthorized = false;
         let tokenClient = null;
         let accessToken = null;
+        let authRetryCount = 0;
+        let currentAuthTimeout = null;
+        const MAX_AUTH_RETRIES = 3;
 
         // Google Drive API 関連定数
         const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // Google CloudコンソールのクライアントIDに置き換え
@@ -209,7 +212,15 @@
                         if (tokenResponse && tokenResponse.access_token) {
                             accessToken = tokenResponse.access_token;
                             isGoogleDriveAuthorized = true;
+                            // 成功時はリトライ状態をリセット
+                            authRetryCount = 0;
+                            if (currentAuthTimeout) {
+                                clearTimeout(currentAuthTimeout);
+                                currentAuthTimeout = null;
+                            }
                             updateGoogleDriveButtons();
+                            const statusEl = document.getElementById('driveAuthStatus');
+                            if (statusEl) statusEl.style.display = 'none';
                             alert('Google Drive に認証しました');
                         } else {
                             console.error('tokenResponse:', tokenResponse);
@@ -231,11 +242,60 @@
         // 認証（トークン取得）
         function authorizeGoogleDrive() {
             if (!tokenClient) {
-                alert('初期化に失敗しました。ページを再読み込みしてください');
+                showAuthFailureMessage('初期化に失敗しました。ページを再読み込みしてください');
                 return;
             }
-            // prompt オプションを指定して明示的に同意画面を表示したい場合は {prompt: 'consent'} を渡す
+            // リトライ回数初期化して試行開始
+            authRetryCount = 0;
+            doRequestWithRetry();
+        }
+
+        function doRequestWithRetry() {
+            // リクエストを発行
             tokenClient.requestAccessToken({ prompt: 'consent' });
+
+            // 指定時間内に accessToken がセットされなければリトライまたは失敗扱いにする
+            if (currentAuthTimeout) {
+                clearTimeout(currentAuthTimeout);
+                currentAuthTimeout = null;
+            }
+            currentAuthTimeout = setTimeout(() => {
+                if (accessToken) {
+                    // 正常に取得済み
+                    if (currentAuthTimeout) { clearTimeout(currentAuthTimeout); currentAuthTimeout = null; }
+                    return;
+                }
+                authRetryCount++;
+                if (authRetryCount < MAX_AUTH_RETRIES) {
+                    // エクスポネンシャルバックオフで再試行
+                    const delay = Math.pow(2, authRetryCount) * 1000;
+                    setTimeout(doRequestWithRetry, delay);
+                } else {
+                    // 失敗: 画面に表示して更新を促す
+                    showAuthFailureMessage('Google Drive の認証に失敗しました。ページを更新してください。');
+                }
+            }, 5000); // 5秒待って応答なければ失敗扱い
+        }
+
+        function showAuthFailureMessage(msg) {
+            let el = document.getElementById('driveAuthStatus');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'driveAuthStatus';
+                el.style.position = 'fixed';
+                el.style.right = '20px';
+                el.style.top = '20px';
+                el.style.background = '#fee';
+                el.style.color = '#500';
+                el.style.padding = '10px 14px';
+                el.style.border = '1px solid #f99';
+                el.style.borderRadius = '6px';
+                el.style.zIndex = '9999';
+                el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
+                document.body.appendChild(el);
+            }
+            el.textContent = msg;
+            el.style.display = 'block';
         }
 
         // Google Drive に保存（REST 使用）
