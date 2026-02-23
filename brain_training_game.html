@@ -199,7 +199,7 @@
         const MAX_CONFIG_RETRIES = 5;
 
         // Google Drive API 関連定数
-        let CLIENT_ID = null; // /cgi-bin/client.cgi から取得
+        let CLIENT_ID = null; // /cgi-bin/clientid.cgi から取得
         let API_KEY = null; // /cgi-bin/apikey.cgi から取得
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
@@ -218,7 +218,7 @@
 
             try {
                 const [clientRes, apiRes] = await Promise.all([
-                    fetch('/cgi-bin/client.cgi'),
+                    fetch('/cgi-bin/clientid.cgi'),
                     fetch('/cgi-bin/apikey.cgi')
                 ]);
                 
