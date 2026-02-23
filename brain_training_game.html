@@ -196,10 +196,42 @@
         const MAX_AUTH_RETRIES = 3;
 
         // Google Drive API 関連定数
-        const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com'; // Google CloudコンソールのクライアントIDに置き換え
-        const API_KEY = 'YOUR_API_KEY'; // Google CloudコンソールのAPIキーに置き換え
+        let CLIENT_ID = null; // /cgi-bin/client.cgi から取得
+        let API_KEY = null; // /cgi-bin/apikey.cgi から取得
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
+
+        // CGI から CLIENT_ID と API_KEY を取得
+        async function loadConfigFromCGI() {
+            try {
+                const [clientRes, apiRes] = await Promise.all([
+                    fetch('/cgi-bin/client.cgi'),
+                    fetch('/cgi-bin/apikey.cgi')
+                ]);
+                
+                if (clientRes.ok) {
+                    CLIENT_ID = (await clientRes.text()).trim();
+                } else {
+                    console.error('Failed to fetch CLIENT_ID:', clientRes.status);
+                }
+                
+                if (apiRes.ok) {
+                    API_KEY = (await apiRes.text()).trim();
+                } else {
+                    console.error('Failed to fetch API_KEY:', apiRes.status);
+                }
+                
+                if (CLIENT_ID && API_KEY) {
+                    initGoogleAPI();
+                } else {
+                    console.error('CLIENT_ID or API_KEY is missing');
+                    showAuthFailureMessage('設定取得に失敗しました。ページを再読み込みしてください。');
+                }
+            } catch (err) {
+                console.error('Error loading config from CGI:', err);
+                showAuthFailureMessage('設定取得エラーが発生しました。ページを再読み込みしてください。');
+            }
+        }
 
         // Google Identity Services (GIS) + Drive REST を使う実装
         function initGoogleAPI() {
@@ -637,10 +669,10 @@
             }
         });
 
-        // ページ読み込み時に記録を読み込む
+        // ページ読み込み時に記録を読み込み、CGI から設定を取得
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
-            initGoogleAPI();
+            loadConfigFromCGI();
         });
     </script>
 </body>
