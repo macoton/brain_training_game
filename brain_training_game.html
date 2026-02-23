@@ -194,6 +194,9 @@
         let authRetryCount = 0;
         let currentAuthTimeout = null;
         const MAX_AUTH_RETRIES = 3;
+        let configRetryCount = 0;
+        let currentConfigTimeout = null;
+        const MAX_CONFIG_RETRIES = 5;
 
         // Google Drive API 関連定数
         let CLIENT_ID = null; // /cgi-bin/client.cgi から取得
@@ -201,35 +204,61 @@
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
 
-        // CGI から CLIENT_ID と API_KEY を取得
-        async function loadConfigFromCGI() {
+        // CGI から CLIENT_ID と API_KEY を取得（リトライ機能付き）
+        function loadConfigFromCGI() {
+            configRetryCount = 0;
+            doConfigRequestWithRetry();
+        }
+
+        async function doConfigRequestWithRetry() {
+            if (currentConfigTimeout) {
+                clearTimeout(currentConfigTimeout);
+                currentConfigTimeout = null;
+            }
+
             try {
                 const [clientRes, apiRes] = await Promise.all([
                     fetch('/cgi-bin/client.cgi'),
                     fetch('/cgi-bin/apikey.cgi')
                 ]);
                 
+                let clientOk = false, apiOk = false;
                 if (clientRes.ok) {
                     CLIENT_ID = (await clientRes.text()).trim();
+                    clientOk = !!CLIENT_ID;
                 } else {
-                    console.error('Failed to fetch CLIENT_ID:', clientRes.status);
+                    console.warn('Failed to fetch CLIENT_ID:', clientRes.status);
                 }
                 
                 if (apiRes.ok) {
                     API_KEY = (await apiRes.text()).trim();
+                    apiOk = !!API_KEY;
                 } else {
-                    console.error('Failed to fetch API_KEY:', apiRes.status);
+                    console.warn('Failed to fetch API_KEY:', apiRes.status);
                 }
                 
-                if (CLIENT_ID && API_KEY) {
+                if (clientOk && apiOk) {
+                    // 成功：リトライ状態をリセット
+                    configRetryCount = 0;
+                    console.log('Config loaded successfully from CGI');
                     initGoogleAPI();
-                } else {
-                    console.error('CLIENT_ID or API_KEY is missing');
-                    showAuthFailureMessage('設定取得に失敗しました。ページを再読み込みしてください。');
+                    return;
                 }
             } catch (err) {
-                console.error('Error loading config from CGI:', err);
-                showAuthFailureMessage('設定取得エラーが発生しました。ページを再読み込みしてください。');
+                console.warn('Error fetching config:', err.message);
+            }
+
+            // 失敗時の処理
+            configRetryCount++;
+            if (configRetryCount < MAX_CONFIG_RETRIES) {
+                // エクスポネンシャルバックオフで再試行
+                const delay = Math.pow(2, configRetryCount) * 1000;
+                console.log(`Retrying config fetch in ${delay}ms (attempt ${configRetryCount}/${MAX_CONFIG_RETRIES})`);
+                currentConfigTimeout = setTimeout(doConfigRequestWithRetry, delay);
+            } else {
+                // 最大リトライ回数に到達：失敗メッセージを表示
+                console.error('Max config retries reached');
+                showAuthFailureMessage('設定取得に失敗しました。ページを再読み込みしてください。');
             }
         }
 
