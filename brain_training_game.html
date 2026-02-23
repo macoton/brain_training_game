@@ -35,6 +35,13 @@
             margin-bottom: 20px;
             flex-shrink: 0;
         }
+        .top-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
         button {
             padding: 10px 20px;
             margin-right: 10px;
@@ -128,22 +135,38 @@
     <!-- ゲーム画面 -->
     <div id="gameScreen" class="screen active">
         <h1>脳トレゲーム</h1>
-        <div id="sizeSelector">
-            <label>グリッドサイズを選択:</label>
-            <button onclick="startGame(5)">5×5</button>
-            <button onclick="startGame(6)">6×6</button>
-            <button onclick="startGame(7)">7×7</button>
-            <button onclick="startGame(8)">8×8</button>
+        <div class="top-bar">
+            <div id="sizeSelector">
+                <label>グリッドサイズを選択:</label>
+                <button onclick="startGame(5)">5×5</button>
+                <button onclick="startGame(6)">6×6</button>
+                <button onclick="startGame(7)">7×7</button>
+                <button onclick="startGame(8)">8×8</button>
+            </div>
+            <div style="margin-left:auto">
+                <button onclick="showRecords()">記録を確認</button>
+            </div>
         </div>
         <div id="gameContainer">
             <div id="grid"></div>
         </div>
-        <button onclick="showRecords()" style="margin-top: 20px;">記録を確認</button>
+        
     </div>
 
     <!-- 記録画面 -->
     <div id="recordScreen" class="screen">
         <h1>ゲーム記録</h1>
+        <div class="top-bar">
+            <div class="button-group">
+                <button onclick="showGame()">ゲームに戻る</button>
+                <button onclick="clearRecords()">記録を削除</button>
+                <button onclick="exportRecords()">JSONで出力</button>
+                <button onclick="importRecords()">JSONから読み込み</button>
+                <button id="driveAuthBtn" onclick="authorizeGoogleDrive()">Google Drive 認証</button>
+                <button id="driveSaveBtn" onclick="saveToGoogleDrive()" style="display:none;">Google Drive に保存</button>
+                <button id="driveLoadBtn" onclick="loadFromGoogleDrive()" style="display:none;">Google Drive から読み込み</button>
+            </div>
+        </div>
         <table id="recordsTable">
             <thead>
                 <tr>
