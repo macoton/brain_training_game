@@ -84,7 +84,9 @@
         #recordsTable {
             margin-top: 20px;
             border-collapse: collapse;
-            flex-shrink: 0;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
         }
         #recordsTable th, #recordsTable td {
             border: 1px solid #000;
@@ -143,6 +145,7 @@
                 <button onclick="startGame(7)">7×7</button>
                 <button onclick="startGame(8)">8×8</button>
             </div>
+            <button id="abortGameBtn" onclick="abortGame()" style="display:none;">中断</button>
             <div style="margin-left:auto">
                 <button onclick="showRecords()">記録を確認</button>
             </div>
@@ -199,6 +202,7 @@
         let currentNumber = 1;
         let startTime;
         let gridSize = 0;
+        let gameInProgress = false;
         let records = [];
         let cellSize = 50;
         let pendingImportData = null;
@@ -609,6 +613,7 @@
 
         function startGame(size) {
             gridSize = size;
+            gameInProgress = true;
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
             
@@ -636,6 +641,21 @@
             });
 
             startTime = new Date();
+            // 中断ボタンを表示
+            const abortBtn = document.getElementById('abortGameBtn');
+            if (abortBtn) abortBtn.style.display = 'inline-block';
+        }
+
+        function abortGame() {
+            if (!gameInProgress) return;
+            if (confirm('ゲームを中断しますか？')) {
+                gameInProgress = false;
+                const grid = document.getElementById('grid');
+                grid.innerHTML = '';
+                gridSize = 0;
+                const abortBtn = document.getElementById('abortGameBtn');
+                if (abortBtn) abortBtn.style.display = 'none';
+            }
         }
 
         function handleClick(num, cell, totalCells, size) {
@@ -643,6 +663,7 @@
                 cell.classList.add('hidden');
                 currentNumber++;
                 if (currentNumber === totalCells + 1) {
+                    gameInProgress = false;
                     const endTime = new Date();
                     const elapsedSeconds = (endTime - startTime) / 1000;
                     const minutes = Math.floor(elapsedSeconds / 60);
@@ -664,6 +685,8 @@
                     const grid = document.getElementById('grid');
                     grid.innerHTML = '';
                     gridSize = 0;
+                    const abortBtn = document.getElementById('abortGameBtn');
+                    if (abortBtn) abortBtn.style.display = 'none';
                 }
             } else {
                 cell.classList.add('wrong');
@@ -705,9 +728,9 @@
             }
         }
 
-        // ウィンドウリサイズ時にゲームを再描画
+        // ウィンドウリサイズ時にゲームを再描画（ゲーム中は除外）
         window.addEventListener('resize', function() {
-            if (gridSize > 0) {
+            if (gridSize > 0 && !gameInProgress) {
                 startGame(gridSize);
             }
         });
