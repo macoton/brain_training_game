@@ -24,10 +24,11 @@
         }
         .screen {
             display: none;
-            height: 100vh;
+            flex: 1;
             padding: 20px;
             overflow-y: auto;
             flex-direction: column;
+            min-height: 0;
         }
         .screen.active {
             display: flex;
@@ -146,17 +147,17 @@
     <div id="gameScreen" class="screen active">
         <h1>脳トレゲーム</h1>
         <div class="top-bar">
-            <div id="sizeSelector">
+            <div id="sizeSelector" style="display: flex; align-items: center; gap: 10px;">
                 <label>グリッドサイズを選択:</label>
                 <button onclick="startGame(5)">5×5</button>
                 <button onclick="startGame(6)">6×6</button>
                 <button onclick="startGame(7)">7×7</button>
                 <button onclick="startGame(8)">8×8</button>
+                <div id="recordButtonWrapper" style="margin-left: auto; white-space: nowrap;">
+                    <button onclick="showRecords()">記録を確認</button>
+                </div>
             </div>
             <button id="abortGameBtn" onclick="abortGame()" style="display:none;">中断</button>
-            <div style="margin-left:auto">
-                <button onclick="showRecords()">記録を確認</button>
-            </div>
         </div>
         <div id="gameContainer">
             <div id="grid"></div>
@@ -625,6 +626,11 @@
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
             
+            // ゲーム開始時にグリッドサイズ選択と記録ボタンを非表示、中断ボタンを表示
+            document.getElementById('sizeSelector').style.display = 'none';
+            document.getElementById('recordButtonWrapper').style.display = 'none';
+            document.getElementById('abortGameBtn').style.display = 'inline-block';
+            
             calculateCellSize(size);
             
             grid.style.gridTemplateColumns = `repeat(${size}, ${cellSize}px)`;
@@ -661,8 +667,10 @@
                 const grid = document.getElementById('grid');
                 grid.innerHTML = '';
                 gridSize = 0;
-                const abortBtn = document.getElementById('abortGameBtn');
-                if (abortBtn) abortBtn.style.display = 'none';
+                // ゲーム終了時にグリッドサイズ選択と記録ボタンを表示、中断ボタンを非表示
+                document.getElementById('sizeSelector').style.display = 'block';
+                document.getElementById('recordButtonWrapper').style.display = 'block';
+                document.getElementById('abortGameBtn').style.display = 'none';
             }
         }
 
@@ -693,8 +701,10 @@
                     const grid = document.getElementById('grid');
                     grid.innerHTML = '';
                     gridSize = 0;
-                    const abortBtn = document.getElementById('abortGameBtn');
-                    if (abortBtn) abortBtn.style.display = 'none';
+                    // ゲーム終了時にグリッドサイズ選択と記録ボタンを表示、中断ボタンを非表示
+                    document.getElementById('sizeSelector').style.display = 'block';
+                    document.getElementById('recordButtonWrapper').style.display = 'block';
+                    document.getElementById('abortGameBtn').style.display = 'none';
                 }
             } else {
                 cell.classList.add('wrong');
@@ -753,32 +763,17 @@
         // 広告パネルの高さ変動を監視
         function initAdPanelObserver() {
             const adPanel = document.getElementById('adPanel');
-            const gameScreen = document.getElementById('gameScreen');
-            const recordScreen = document.getElementById('recordScreen');
 
             if (!adPanel) return;
 
             // ResizeObserver で adPanel の高さ変動を監視
+            // flex レイアウトにより、gameScreen は自動的に adPanel の下に配置される
             const observer = new ResizeObserver(() => {
-                const adHeight = adPanel.offsetHeight;
-                // 広告が表示されている場合のみ調整
-                if (adPanel.style.display !== 'none') {
-                    gameScreen.style.marginTop = adHeight + 'px';
-                    recordScreen.style.marginTop = adHeight + 'px';
-                } else {
-                    gameScreen.style.marginTop = '0';
-                    recordScreen.style.marginTop = '0';
-                }
+                // flex レイアウトが自動的に処理するため、ここで追加の調整は不要
+                // console.log('Ad panel height changed to:', adPanel.offsetHeight);
             });
 
             observer.observe(adPanel);
-
-            // 初期化時にも一度実行
-            const adHeight = adPanel.offsetHeight;
-            if (adPanel.style.display !== 'none') {
-                gameScreen.style.marginTop = adHeight + 'px';
-                recordScreen.style.marginTop = adHeight + 'px';
-            }
         }
 
         // 広告パネルにコンテンツを設定（外部から呼び出し用）
@@ -795,10 +790,7 @@
             const adPanel = document.getElementById('adPanel');
             if (adPanel) {
                 adPanel.style.display = 'none';
-                const gameScreen = document.getElementById('gameScreen');
-                const recordScreen = document.getElementById('recordScreen');
-                gameScreen.style.marginTop = '0';
-                recordScreen.style.marginTop = '0';
+                // flex レイアウトが自動的に gameScreen を上部に移動させる
             }
         }
     </script>
