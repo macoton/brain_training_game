@@ -16,6 +16,11 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            margin: 0;
+        }
+        #adPanel {
+            flex-shrink: 0;
+            transition: height 0.2s ease-out;
         }
         .screen {
             display: none;
@@ -135,6 +140,9 @@
 </head>
 <body>
     <!-- ゲーム画面 -->
+    <!-- 広告パネル -->
+    <div id="adPanel" style="display: none; background-color: #f0f0f0; padding: 10px; border-bottom: 1px solid #ccc;"></div>
+
     <div id="gameScreen" class="screen active">
         <h1>脳トレゲーム</h1>
         <div class="top-bar">
@@ -739,7 +747,60 @@
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
             loadConfigFromCGI();
+            initAdPanelObserver();
         });
+
+        // 広告パネルの高さ変動を監視
+        function initAdPanelObserver() {
+            const adPanel = document.getElementById('adPanel');
+            const gameScreen = document.getElementById('gameScreen');
+            const recordScreen = document.getElementById('recordScreen');
+
+            if (!adPanel) return;
+
+            // ResizeObserver で adPanel の高さ変動を監視
+            const observer = new ResizeObserver(() => {
+                const adHeight = adPanel.offsetHeight;
+                // 広告が表示されている場合のみ調整
+                if (adPanel.style.display !== 'none') {
+                    gameScreen.style.marginTop = adHeight + 'px';
+                    recordScreen.style.marginTop = adHeight + 'px';
+                } else {
+                    gameScreen.style.marginTop = '0';
+                    recordScreen.style.marginTop = '0';
+                }
+            });
+
+            observer.observe(adPanel);
+
+            // 初期化時にも一度実行
+            const adHeight = adPanel.offsetHeight;
+            if (adPanel.style.display !== 'none') {
+                gameScreen.style.marginTop = adHeight + 'px';
+                recordScreen.style.marginTop = adHeight + 'px';
+            }
+        }
+
+        // 広告パネルにコンテンツを設定（外部から呼び出し用）
+        function setAdContent(htmlContent) {
+            const adPanel = document.getElementById('adPanel');
+            if (adPanel) {
+                adPanel.innerHTML = htmlContent;
+                adPanel.style.display = 'block';
+            }
+        }
+
+        // 広告パネルを非表示
+        function hideAdPanel() {
+            const adPanel = document.getElementById('adPanel');
+            if (adPanel) {
+                adPanel.style.display = 'none';
+                const gameScreen = document.getElementById('gameScreen');
+                const recordScreen = document.getElementById('recordScreen');
+                gameScreen.style.marginTop = '0';
+                recordScreen.style.marginTop = '0';
+            }
+        }
     </script>
 </body>
 </html>
