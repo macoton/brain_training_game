@@ -40,6 +40,9 @@
         #sizeSelector {
             margin-bottom: 20px;
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         .top-bar {
             display: flex;
@@ -147,7 +150,7 @@
     <div id="gameScreen" class="screen active">
         <h1>脳トレゲーム</h1>
         <div class="top-bar">
-            <div id="sizeSelector" style="display: flex; align-items: center; gap: 10px;">
+            <div id="sizeSelector">
                 <label>グリッドサイズを選択:</label>
                 <button onclick="startGame(5)">5×5</button>
                 <button onclick="startGame(6)">6×6</button>
@@ -218,78 +221,15 @@
         let isGoogleDriveAuthorized = false;
         let tokenClient = null;
         let accessToken = null;
-        let authRetryCount = 0;
-        let currentAuthTimeout = null;
-        const MAX_AUTH_RETRIES = 3;
-        let configRetryCount = 0;
-        let currentConfigTimeout = null;
-        const MAX_CONFIG_RETRIES = 5;
 
         // Google Drive API 関連定数
-        let CLIENT_ID = null; // /cgi-bin/clientid.cgi から取得
-        let API_KEY = null; // /cgi-bin/apikey.cgi から取得
+        // CLIENT_ID と API_KEY は環境に応じて設定してください
+        const CLIENT_ID = 'YOUR_CLIENT_ID';
+        const API_KEY = 'YOUR_API_KEY';
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
 
-        // CGI から CLIENT_ID と API_KEY を取得（リトライ機能付き）
-        function loadConfigFromCGI() {
-            configRetryCount = 0;
-            doConfigRequestWithRetry();
-        }
-
-        async function doConfigRequestWithRetry() {
-            if (currentConfigTimeout) {
-                clearTimeout(currentConfigTimeout);
-                currentConfigTimeout = null;
-            }
-
-            try {
-                const [clientRes, apiRes] = await Promise.all([
-                    fetch('/cgi-bin/clientid.cgi'),
-                    fetch('/cgi-bin/apikey.cgi')
-                ]);
-                
-                let clientOk = false, apiOk = false;
-                if (clientRes.ok) {
-                    CLIENT_ID = (await clientRes.text()).trim();
-                    clientOk = !!CLIENT_ID;
-                } else {
-                    console.warn('Failed to fetch CLIENT_ID:', clientRes.status);
-                }
-                
-                if (apiRes.ok) {
-                    API_KEY = (await apiRes.text()).trim();
-                    apiOk = !!API_KEY;
-                } else {
-                    console.warn('Failed to fetch API_KEY:', apiRes.status);
-                }
-                
-                if (clientOk && apiOk) {
-                    // 成功：リトライ状態をリセット
-                    configRetryCount = 0;
-                    console.log('Config loaded successfully from CGI');
-                    initGoogleAPI();
-                    return;
-                }
-            } catch (err) {
-                console.warn('Error fetching config:', err.message);
-            }
-
-            // 失敗時の処理
-            configRetryCount++;
-            if (configRetryCount < MAX_CONFIG_RETRIES) {
-                // エクスポネンシャルバックオフで再試行
-                const delay = Math.pow(2, configRetryCount) * 1000;
-                console.log(`Retrying config fetch in ${delay}ms (attempt ${configRetryCount}/${MAX_CONFIG_RETRIES})`);
-                currentConfigTimeout = setTimeout(doConfigRequestWithRetry, delay);
-            } else {
-                // 最大リトライ回数に到達：失敗メッセージを表示
-                console.error('Max config retries reached');
-                showAuthFailureMessage('設定取得に失敗しました。ページを再読み込みしてください。');
-            }
-        }
-
-        // Google Identity Services (GIS) + Drive REST を使う実装
+        // Google Identity Services (GIS) の初期化
         function initGoogleAPI() {
             // tokenClient を GIS で初期化
             if (window.google && google.accounts && google.accounts.oauth2) {
@@ -300,18 +240,11 @@
                         if (tokenResponse && tokenResponse.access_token) {
                             accessToken = tokenResponse.access_token;
                             isGoogleDriveAuthorized = true;
-                            // 成功時はリトライ状態をリセット
-                            authRetryCount = 0;
-                            if (currentAuthTimeout) {
-                                clearTimeout(currentAuthTimeout);
-                                currentAuthTimeout = null;
-                            }
                             updateGoogleDriveButtons();
-                            const statusEl = document.getElementById('driveAuthStatus');
-                            if (statusEl) statusEl.style.display = 'none';
                             alert('Google Drive に認証しました');
                         } else {
                             console.error('tokenResponse:', tokenResponse);
+                            alert('認証に失敗しました');
                         }
                     }
                 });
@@ -330,60 +263,10 @@
         // 認証（トークン取得）
         function authorizeGoogleDrive() {
             if (!tokenClient) {
-                showAuthFailureMessage('初期化に失敗しました。ページを再読み込みしてください');
+                alert('初期化に失敗しました。ページを再読み込みしてください');
                 return;
             }
-            // リトライ回数初期化して試行開始
-            authRetryCount = 0;
-            doRequestWithRetry();
-        }
-
-        function doRequestWithRetry() {
-            // リクエストを発行
             tokenClient.requestAccessToken({ prompt: 'consent' });
-
-            // 指定時間内に accessToken がセットされなければリトライまたは失敗扱いにする
-            if (currentAuthTimeout) {
-                clearTimeout(currentAuthTimeout);
-                currentAuthTimeout = null;
-            }
-            currentAuthTimeout = setTimeout(() => {
-                if (accessToken) {
-                    // 正常に取得済み
-                    if (currentAuthTimeout) { clearTimeout(currentAuthTimeout); currentAuthTimeout = null; }
-                    return;
-                }
-                authRetryCount++;
-                if (authRetryCount < MAX_AUTH_RETRIES) {
-                    // エクスポネンシャルバックオフで再試行
-                    const delay = Math.pow(2, authRetryCount) * 1000;
-                    setTimeout(doRequestWithRetry, delay);
-                } else {
-                    // 失敗: 画面に表示して更新を促す
-                    showAuthFailureMessage('Google Drive の認証に失敗しました。ページを更新してください。');
-                }
-            }, 5000); // 5秒待って応答なければ失敗扱い
-        }
-
-        function showAuthFailureMessage(msg) {
-            let el = document.getElementById('driveAuthStatus');
-            if (!el) {
-                el = document.createElement('div');
-                el.id = 'driveAuthStatus';
-                el.style.position = 'fixed';
-                el.style.right = '20px';
-                el.style.top = '20px';
-                el.style.background = '#fee';
-                el.style.color = '#500';
-                el.style.padding = '10px 14px';
-                el.style.border = '1px solid #f99';
-                el.style.borderRadius = '6px';
-                el.style.zIndex = '9999';
-                el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.1)';
-                document.body.appendChild(el);
-            }
-            el.textContent = msg;
-            el.style.display = 'block';
         }
 
         // Google Drive に保存（REST 使用）
@@ -433,10 +316,18 @@
                 } else {
                     console.error(await res.text());
                     alert('保存エラー');
+                    // 失敗時は認証状態をリセット
+                    isGoogleDriveAuthorized = false;
+                    accessToken = null;
+                    updateGoogleDriveButtons();
                 }
             } catch (err) {
                 console.error(err);
                 alert('保存エラー');
+                // 失敗時は認証状態をリセット
+                isGoogleDriveAuthorized = false;
+                accessToken = null;
+                updateGoogleDriveButtons();
             }
         }
 
@@ -453,10 +344,18 @@
                 } else {
                     console.error(await res.text());
                     alert('保存エラー');
+                    // 失敗時は認証状態をリセット
+                    isGoogleDriveAuthorized = false;
+                    accessToken = null;
+                    updateGoogleDriveButtons();
                 }
             } catch (err) {
                 console.error(err);
                 alert('保存エラー');
+                // 失敗時は認証状態をリセット
+                isGoogleDriveAuthorized = false;
+                accessToken = null;
+                updateGoogleDriveButtons();
             }
         }
 
@@ -477,15 +376,27 @@
                     const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
                         headers: { 'Authorization': 'Bearer ' + accessToken }
                     });
-                    const data = await fileRes.json();
-                    pendingImportData = data;
-                    document.getElementById('loadModal').classList.add('active');
+                    if (fileRes.ok) {
+                        const data = await fileRes.json();
+                        pendingImportData = data;
+                        document.getElementById('loadModal').classList.add('active');
+                    } else {
+                        alert('読み込みエラー');
+                        // 失敗時は認証状態をリセット
+                        isGoogleDriveAuthorized = false;
+                        accessToken = null;
+                        updateGoogleDriveButtons();
+                    }
                 } else {
                     alert('Google Drive にファイルがありません');
                 }
             } catch (err) {
                 console.error(err);
                 alert('読み込みエラー');
+                // 失敗時は認証状態をリセット
+                isGoogleDriveAuthorized = false;
+                accessToken = null;
+                updateGoogleDriveButtons();
             }
         }
 
@@ -753,10 +664,10 @@
             }
         });
 
-        // ページ読み込み時に記録を読み込み、CGI から設定を取得
+        // ページ読み込み時に記録を読み込み、Google API を初期化
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
-            loadConfigFromCGI();
+            initGoogleAPI();
             initAdPanelObserver();
         });
 
