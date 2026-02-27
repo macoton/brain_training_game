@@ -457,6 +457,7 @@
             } else {
                 records = [];
             }
+            renderPlayerNames();
         }
 
         // 記録をローカルストレージに保存
@@ -481,33 +482,22 @@
             document.getElementById('fileInput').click();
         }
 
-        // プレイヤー名の保存 (ローカルストレージ)
-        function loadPlayerNames() {
-            const saved = localStorage.getItem('playerNames');
-            return saved ? JSON.parse(saved) : [];
-        }
-
-        function savePlayerNames(names) {
-            localStorage.setItem('playerNames', JSON.stringify(names));
-        }
-
-        function addPlayerName(name) {
-            if (!name) return;
-            const names = loadPlayerNames();
-            if (!names.includes(name)) {
-                names.unshift(name);
-                // 最大10件程度に制限
-                if (names.length > 10) names.pop();
-                savePlayerNames(names);
-                renderPlayerNames();
-            }
+        // プレイヤー名リストは記録から抽出
+        function getPlayerNamesFromRecords() {
+            const names = [];
+            records.forEach(r => {
+                if (r.playerName && !names.includes(r.playerName)) {
+                    names.push(r.playerName);
+                }
+            });
+            return names;
         }
 
         function renderPlayerNames() {
             const list = document.getElementById('playerNamesList');
             if (!list) return;
             list.innerHTML = '';
-            const names = loadPlayerNames();
+            const names = getPlayerNamesFromRecords();
             names.forEach(n => {
                 const btn = document.createElement('button');
                 btn.textContent = n;
@@ -598,9 +588,25 @@
                 playerName: playerName || ''
             });
             saveRecords();
+            renderPlayerNames();
         }
 
         function startGame(size) {
+            // 名前重複チェック
+            const inputEl = document.getElementById('playerNameInput');
+            if (inputEl) {
+                const nameVal = inputEl.value.trim();
+                if (nameVal) {
+                    // 規則:既存の記録に同名がある場合は再入力を促して中断
+                    loadRecords(); // ensure records updated
+                    const exists = records.some(r => r.playerName === nameVal);
+                    if (exists) {
+                        alert('その名前の記録が既に存在します。別の名前を入力してください。');
+                        inputEl.focus();
+                        return;
+                    }
+                }
+            }
             gridSize = size;
             gameInProgress = true;
             const grid = document.getElementById('grid');
@@ -674,7 +680,6 @@
                     
                         const playerName = (document.getElementById('playerNameInput') && document.getElementById('playerNameInput').value) ? document.getElementById('playerNameInput').value.trim() : '';
                         addRecord(`${size}×${size}`, timeStr, datetimeStr, playerName);
-                        if (playerName) addPlayerName(playerName);
                     
                     alert(`ゲーム終了！所要時間: ${timeStr}`);
                     
