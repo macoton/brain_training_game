@@ -156,6 +156,8 @@
                 <button onclick="startGame(6)">6×6</button>
                 <button onclick="startGame(7)">7×7</button>
                 <button onclick="startGame(8)">8×8</button>
+                <input id="playerNameInput" type="text" placeholder="名前を入力" style="padding:8px 10px; font-size:16px; margin-left:8px;">
+                <div id="playerNamesList" style="display:flex; gap:6px; margin-left:8px;"></div>
                 <div id="recordButtonWrapper" style="margin-left: auto; white-space: nowrap;">
                     <button onclick="showRecords()">記録を確認</button>
                 </div>
@@ -188,6 +190,7 @@
                     <th>グリッドサイズ</th>
                     <th>所要時間</th>
                     <th>日時</th>
+                    <th>プレイヤー名</th>
                 </tr>
             </thead>
             <tbody id="recordsBody">
@@ -478,6 +481,46 @@
             document.getElementById('fileInput').click();
         }
 
+        // プレイヤー名の保存 (ローカルストレージ)
+        function loadPlayerNames() {
+            const saved = localStorage.getItem('playerNames');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function savePlayerNames(names) {
+            localStorage.setItem('playerNames', JSON.stringify(names));
+        }
+
+        function addPlayerName(name) {
+            if (!name) return;
+            const names = loadPlayerNames();
+            if (!names.includes(name)) {
+                names.unshift(name);
+                // 最大10件程度に制限
+                if (names.length > 10) names.pop();
+                savePlayerNames(names);
+                renderPlayerNames();
+            }
+        }
+
+        function renderPlayerNames() {
+            const list = document.getElementById('playerNamesList');
+            if (!list) return;
+            list.innerHTML = '';
+            const names = loadPlayerNames();
+            names.forEach(n => {
+                const btn = document.createElement('button');
+                btn.textContent = n;
+                btn.style.padding = '6px 10px';
+                btn.style.fontSize = '14px';
+                btn.addEventListener('click', () => {
+                    const input = document.getElementById('playerNameInput');
+                    if (input) input.value = n;
+                });
+                list.appendChild(btn);
+            });
+        }
+
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -547,11 +590,12 @@
         }
 
         // 記録を追加
-        function addRecord(size, time, datetime) {
+        function addRecord(size, time, datetime, playerName) {
             records.push({
                 size: size,
                 time: time,
-                datetime: datetime
+                datetime: datetime,
+                playerName: playerName || ''
             });
             saveRecords();
         }
@@ -564,7 +608,7 @@
             
             // ゲーム開始時にグリッドサイズ選択と記録ボタンを非表示、中断ボタンを表示
             document.getElementById('sizeSelector').style.display = 'none';
-            document.getElementById('recordButtonWrapper').style.display = 'none';
+            // recordButtonWrapper is inside sizeSelector so will be hidden automatically
             document.getElementById('abortGameBtn').style.display = 'inline-block';
             
             calculateCellSize(size);
@@ -628,7 +672,9 @@
                     const secs = String(endTime.getSeconds()).padStart(2, '0');
                     const datetimeStr = `${year}年${month}月${date}日 ${hours}:${mins}:${secs}`;
                     
-                    addRecord(`${size}×${size}`, timeStr, datetimeStr);
+                        const playerName = (document.getElementById('playerNameInput') && document.getElementById('playerNameInput').value) ? document.getElementById('playerNameInput').value.trim() : '';
+                        addRecord(`${size}×${size}`, timeStr, datetimeStr, playerName);
+                        if (playerName) addPlayerName(playerName);
                     
                     alert(`ゲーム終了！所要時間: ${timeStr}`);
                     
@@ -657,6 +703,7 @@
                     <td>${record.size}</td>
                     <td>${record.time}</td>
                     <td>${record.datetime}</td>
+                    <td>${record.playerName ? record.playerName : ''}</td>
                 `;
                 recordsBody.appendChild(row);
             });
@@ -689,6 +736,7 @@
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
             loadConfigFromCGI();
+            renderPlayerNames();
             initAdPanelObserver();
         });
 
