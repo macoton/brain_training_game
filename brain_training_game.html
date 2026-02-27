@@ -223,11 +223,36 @@
         let accessToken = null;
 
         // Google Drive API 関連定数
-        // CLIENT_ID と API_KEY は環境に応じて設定してください
-        const CLIENT_ID = 'YOUR_CLIENT_ID';
-        const API_KEY = 'YOUR_API_KEY';
+        // CLIENT_ID と API_KEY は /cgi-bin から取得
+        let CLIENT_ID = null;
+        let API_KEY = null;
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
+
+        // /cgi-bin から CLIENT_ID と API_KEY を取得
+        async function loadConfigFromCGI() {
+            try {
+                const [clientRes, apiRes] = await Promise.all([
+                    fetch('/cgi-bin/clientid.cgi'),
+                    fetch('/cgi-bin/apikey.cgi')
+                ]);
+                
+                if (clientRes.ok) {
+                    CLIENT_ID = (await clientRes.text()).trim();
+                }
+                if (apiRes.ok) {
+                    API_KEY = (await apiRes.text()).trim();
+                }
+                
+                if (CLIENT_ID && API_KEY) {
+                    initGoogleAPI();
+                } else {
+                    console.warn('Failed to load CLIENT_ID or API_KEY from CGI');
+                }
+            } catch (err) {
+                console.error('Error loading config from CGI:', err);
+            }
+        }
 
         // Google Identity Services (GIS) の初期化
         function initGoogleAPI() {
@@ -664,10 +689,10 @@
             }
         });
 
-        // ページ読み込み時に記録を読み込み、Google API を初期化
+        // ページ読み込み時に記録を読み込み、Google API 設定を取得して初期化
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
-            initGoogleAPI();
+            loadConfigFromCGI();
             initAdPanelObserver();
         });
 
