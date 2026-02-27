@@ -505,7 +505,10 @@
                 btn.style.fontSize = '14px';
                 btn.addEventListener('click', () => {
                     const input = document.getElementById('playerNameInput');
-                    if (input) input.value = n;
+                    if (input) {
+                        input.value = n;
+                        allowExistingName = true;
+                    }
                 });
                 list.appendChild(btn);
             });
@@ -591,22 +594,29 @@
             renderPlayerNames();
         }
 
+        let allowExistingName = false; // ボタンで選択した場合のみ許可されるフラグ
+
         function startGame(size) {
             // 名前重複チェック
             const inputEl = document.getElementById('playerNameInput');
             if (inputEl) {
                 const nameVal = inputEl.value.trim();
                 if (nameVal) {
-                    // 規則:既存の記録に同名がある場合は再入力を促して中断
-                    loadRecords(); // ensure records updated
-                    const exists = records.some(r => r.playerName === nameVal);
-                    if (exists) {
-                        alert('その名前の記録が既に存在します。別の名前を入力してください。');
-                        inputEl.focus();
-                        return;
+                    // 入力によるチェックのみ。ボタンでセットされた場合は allowExistingName が true
+                    if (!allowExistingName) {
+                        loadRecords(); // ensure records updated
+                        const exists = records.some(r => r.playerName === nameVal);
+                        if (exists) {
+                            alert('その名前の記録が既に存在します。別の名前を入力してください。');
+                            inputEl.focus();
+                            return;
+                        }
                     }
                 }
             }
+            // reset flag after check
+            allowExistingName = false;
+
             gridSize = size;
             gameInProgress = true;
             const grid = document.getElementById('grid');
@@ -743,6 +753,12 @@
             loadConfigFromCGI();
             renderPlayerNames();
             initAdPanelObserver();
+            const input = document.getElementById('playerNameInput');
+            if (input) {
+                input.addEventListener('input', () => {
+                    allowExistingName = false;
+                });
+            }
         });
 
         // 広告パネルの高さ変動を監視
