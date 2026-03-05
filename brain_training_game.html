@@ -22,6 +22,30 @@
             flex-shrink: 0;
             transition: height 0.2s ease-out;
         }
+        #topNav {
+            display: flex;
+            gap: 10px;
+            padding: 10px 20px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+            flex-shrink: 0;
+        }
+        #topNav button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #e0e0e0;
+            border: 1px solid #999;
+            border-radius: 4px;
+        }
+        #topNav button.active {
+            background-color: #007bff;
+            color: white;
+        }
+        #topNav button:hover {
+            background-color: #0056b3;
+            color: white;
+        }
         .screen {
             display: none;
             flex: 1;
@@ -43,6 +67,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
         .top-bar {
             display: flex;
@@ -87,11 +112,7 @@
         .cell.wrong {
             background-color: red;
         }
-        #recordScreen {
-            flex-direction: column;
-        }
         #recordsTable {
-            margin-top: 20px;
             border-collapse: collapse;
             flex: 1;
             overflow-y: auto;
@@ -111,6 +132,9 @@
         .button-group {
             margin-top: 20px;
             flex-shrink: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .modal {
             display: none;
@@ -143,10 +167,17 @@
     </style>
 </head>
 <body>
-    <!-- ゲーム画面 -->
     <!-- 広告パネル -->
     <div id="adPanel" style="display: none; background-color: #f0f0f0; padding: 10px; border-bottom: 1px solid #ccc;"></div>
 
+    <!-- トップナビゲーションバー -->
+    <div id="topNav">
+        <button onclick="showScreen('gameScreen')" class="nav-btn active" data-screen="gameScreen">ゲーム</button>
+        <button onclick="showScreen('scoreScreen')" class="nav-btn" data-screen="scoreScreen">スコア</button>
+        <button onclick="showScreen('settingsScreen')" class="nav-btn" data-screen="settingsScreen">記録を確認</button>
+    </div>
+
+    <!-- ゲーム画面 -->
     <div id="gameScreen" class="screen active">
         <h1>脳トレゲーム</h1>
         <div class="top-bar">
@@ -158,33 +189,17 @@
                 <button onclick="startGame(8)">8×8</button>
                 <input id="playerNameInput" type="text" placeholder="名前を入力" style="padding:8px 10px; font-size:16px; margin-left:8px;">
                 <div id="playerNamesList" style="display:flex; gap:6px; margin-left:8px;"></div>
-                <div id="recordButtonWrapper" style="margin-left: auto; white-space: nowrap;">
-                    <button onclick="showRecords()">記録を確認</button>
-                </div>
             </div>
             <button id="abortGameBtn" onclick="abortGame()" style="display:none;">中断</button>
         </div>
         <div id="gameContainer">
             <div id="grid"></div>
         </div>
-        
     </div>
 
-    <!-- 記録画面 -->
-    <div id="recordScreen" class="screen">
-        <h1>ゲーム記録</h1>
-        <div class="top-bar">
-            <div class="button-group">
-                <button onclick="showGame()">ゲームに戻る</button>
-                <button onclick="clearRecords()">記録を削除</button>
-                <button onclick="exportRecords()">JSONで出力</button>
-                <button onclick="importRecords()">JSONから読み込み</button>
-                <button id="driveAuthBtn" onclick="authorizeGoogleDrive()">Google Drive 認証</button>
-                <button id="driveSaveBtn" onclick="saveToGoogleDrive()" style="display:none;">Google Drive に保存</button>
-                <button id="driveLoadBtn" onclick="loadFromGoogleDrive()" style="display:none;">Google Drive から読み込み</button>
-                <button id="driveAutoSyncBtn" onclick="toggleAutoSync()" style="display:none;">自動同期: オフ</button>
-            </div>
-        </div>
+    <!-- スコア画面 -->
+    <div id="scoreScreen" class="screen">
+        <h1>スコア</h1>
         <table id="recordsTable">
             <thead>
                 <tr>
@@ -197,6 +212,20 @@
             <tbody id="recordsBody">
             </tbody>
         </table>
+    </div>
+
+    <!-- 記録を確認画面 -->
+    <div id="settingsScreen" class="screen">
+        <h1>記録を確認</h1>
+        <div class="button-group">
+            <button onclick="clearRecords()">記録を削除</button>
+            <button onclick="exportRecords()">JSONで出力</button>
+            <button onclick="importRecords()">JSONから読み込み</button>
+            <button id="driveAuthBtn" onclick="authorizeGoogleDrive()">Google Drive 認証</button>
+            <button id="driveSaveBtn" onclick="saveToGoogleDrive()" style="display:none;">Google Drive に保存</button>
+            <button id="driveLoadBtn" onclick="loadFromGoogleDrive()" style="display:none;">Google Drive から読み込み</button>
+            <button id="driveAutoSyncBtn" onclick="toggleAutoSync()" style="display:none;">自動同期: オフ</button>
+        </div>
     </div>
 
     <!-- ロードモーダル -->
@@ -233,6 +262,59 @@
         let API_KEY = null;
         const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
         const FILENAME = 'brain_training_records.json';
+
+        // 画面切り替え関数
+        function showScreen(screenName) {
+            // すべてのスクリーンを非表示
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            
+            // すべてのナビゲーションボタンから active クラスを削除
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // 指定されたスクリーンを表示
+            const screen = document.getElementById(screenName);
+            if (screen) {
+                screen.classList.add('active');
+                // 対応するナビゲーションボタンに active クラスを付与
+                const navBtn = document.querySelector(`.nav-btn[data-screen="${screenName}"]`);
+                if (navBtn) {
+                    navBtn.classList.add('active');
+                }
+                
+                // スコア画面が表示される場合、記録を読み込んで表示
+                if (screenName === 'scoreScreen') {
+                    loadRecords();
+                    showRecordsTable();
+                }
+                
+                // 記録を確認画面が表示される場合
+                if (screenName === 'settingsScreen') {
+                    loadRecords();
+                }
+            }
+        }
+
+        // 記録テーブルを表示（scoreScreenで使用）
+        function showRecordsTable() {
+            const recordsBody = document.getElementById('recordsBody');
+            if (!recordsBody) return;
+            recordsBody.innerHTML = '';
+            
+            records.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.size}</td>
+                    <td>${record.time}</td>
+                    <td>${record.datetime}</td>
+                    <td>${record.playerName ? record.playerName : ''}</td>
+                `;
+                recordsBody.appendChild(row);
+            });
+        }
 
         // /cgi-bin から CLIENT_ID と API_KEY を取得
         async function loadConfigFromCGI() {
@@ -639,9 +721,9 @@
                 records = pendingImportData;
                 sortRecords();
                 saveRecords();
-                showRecords();
                 alert('記録を上書きロードしました');
                 closeLoadModal();
+                showScreen('scoreScreen');
                 maybeAutoSync();
             }
         }
@@ -668,9 +750,9 @@
                 }
                 sortRecords();
                 saveRecords();
-                showRecords();
                 alert(`マージ完了: 追加 ${added} 件、重複スキップ ${skipped} 件`);
                 closeLoadModal();
+                showScreen('scoreScreen');
                 maybeAutoSync();
             }
         }
@@ -763,8 +845,9 @@
                 const grid = document.getElementById('grid');
                 grid.innerHTML = '';
                 gridSize = 0;
-                // ゲーム終了時にグリッドサイズ選択と記録ボタンを表示、中断ボタンを非表示
-                document.getElementById('sizeSelector').style.display = 'flex';                document.getElementById('recordButtonWrapper').style.display = '';                document.getElementById('abortGameBtn').style.display = 'none';
+                // ゲーム終了時にグリッドサイズ選択を表示、中断ボタンを非表示
+                document.getElementById('sizeSelector').style.display = 'flex';
+                document.getElementById('abortGameBtn').style.display = 'none';
             }
         }
 
@@ -796,8 +879,9 @@
                     const grid = document.getElementById('grid');
                     grid.innerHTML = '';
                     gridSize = 0;
-                    // ゲーム終了時にグリッドサイズ選択と記録ボタンを表示、中断ボタンを非表示
-                    document.getElementById('sizeSelector').style.display = 'flex';                    document.getElementById('recordButtonWrapper').style.display = '';                    document.getElementById('abortGameBtn').style.display = 'none';
+                    // ゲーム終了時にグリッドサイズ選択を表示、中断ボタンを非表示
+                    document.getElementById('sizeSelector').style.display = 'flex';
+                    document.getElementById('abortGameBtn').style.display = 'none';
                 }
             } else {
                 cell.classList.add('wrong');
@@ -807,36 +891,13 @@
             }
         }
 
-        function showRecords() {
-            loadRecords();
-            const recordsBody = document.getElementById('recordsBody');
-            recordsBody.innerHTML = '';
-            
-            records.forEach(record => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${record.size}</td>
-                    <td>${record.time}</td>
-                    <td>${record.datetime}</td>
-                    <td>${record.playerName ? record.playerName : ''}</td>
-                `;
-                recordsBody.appendChild(row);
-            });
 
-            document.getElementById('gameScreen').classList.remove('active');
-            document.getElementById('recordScreen').classList.add('active');
-        }
-
-        function showGame() {
-            document.getElementById('recordScreen').classList.remove('active');
-            document.getElementById('gameScreen').classList.add('active');
-        }
 
         function clearRecords() {
             if (confirm('本当に全ての記録を削除しますか？')) {
                 records = [];
                 saveRecords();
-                showRecords();
+                showScreen('scoreScreen');
                 maybeAutoSync();
             }
         }
