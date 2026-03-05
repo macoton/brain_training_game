@@ -182,6 +182,7 @@
                 <button id="driveAuthBtn" onclick="authorizeGoogleDrive()">Google Drive 認証</button>
                 <button id="driveSaveBtn" onclick="saveToGoogleDrive()" style="display:none;">Google Drive に保存</button>
                 <button id="driveLoadBtn" onclick="loadFromGoogleDrive()" style="display:none;">Google Drive から読み込み</button>
+                <button id="driveAutoSyncBtn" onclick="toggleAutoSync()" style="display:none;">自動同期: オフ</button>
             </div>
         </div>
         <table id="recordsTable">
@@ -224,6 +225,7 @@
         let isGoogleDriveAuthorized = false;
         let tokenClient = null;
         let accessToken = null;
+        let autoSync = false;
 
         // Google Drive API 関連定数
         // CLIENT_ID と API_KEY は /cgi-bin から取得
@@ -286,6 +288,7 @@
             document.getElementById('driveAuthBtn').style.display = isGoogleDriveAuthorized ? 'none' : 'inline-block';
             document.getElementById('driveSaveBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveLoadBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
+            document.getElementById('driveAutoSyncBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
         }
 
         // 認証（トークン取得）
@@ -428,6 +431,100 @@
             }
         }
 
+        // 自動同期を呼ぶか判定
+        function maybeAutoSync() {
+            if (autoSync && isGoogleDriveAuthorized) {
+                autoSyncDrive();
+            }
+        }
+
+        // 自動同期: リモートと同期してローカルを更新
+        async function autoSyncDrive() {
+            if (!accessToken) return;
+            
+            // 重複排除とソート用のヘルパー関数
+            const deduplicateAndSort = (recordList) => {
+                if (!recordList || recordList.length === 0) return [];
+                const seen = new Set();
+                const unique = [];
+                recordList.forEach(r => {
+                    if (!r.datetime || !r.size || !r.time) return; // 無効なレコードをスキップ
+                    // datetime, size, time の組み合わせで一意判定
+                    const key = `${r.datetime}|${r.size}|${r.time}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        unique.push(r);
+                    }
+                });
+                // datetime の降順（新しい順）でソート
+                unique.sort((a, b) => b.datetime.localeCompare(a.datetime));
+                return unique;
+            };
+            
+            try {
+                // リモートファイルを検索
+                const listUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&pageSize=10&fields=files(id,name)&q=${encodeURIComponent("name='"+FILENAME+"'")}`;
+                const listRes = await fetch(listUrl, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                
+                if (!listRes.ok) {
+                    console.warn('autoSyncDrive: listRes status', listRes.status);
+                    return; // リモートにファイルがない場合もスキップ
+                }
+                
+                const listData = await listRes.json();
+                const files = listData.files || [];
+                
+                if (files.length === 0) {
+                    // リモートにファイルがない場合は、ローカルを保存
+                    await saveToGoogleDrive();
+                    return;
+                }
+                
+                // リモートデータを取得
+                const fileId = files[0].id;
+                const fileRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                    headers: { 'Authorization': 'Bearer ' + accessToken }
+                });
+                
+                if (!fileRes.ok) {
+                    console.error('autoSyncDrive: fetch remote failed', fileRes.status);
+                    return;
+                }
+                
+                const remoteData = await fileRes.json();
+                const remoteRecords = remoteData || [];
+                
+                // ローカルとリモートをマージ
+                const merged = deduplicateAndSort(records.concat(remoteRecords || []));
+                
+                // ローカルのレコードを更新
+                records = merged;
+                saveRecords();
+                
+                // マージ後、リモートにも保存（最新状態に同期）
+                const fileContent = JSON.stringify(records, null, 2);
+                const file = new Blob([fileContent], { type: 'application/json' });
+                await updateGoogleDriveFile(fileId, file);
+            } catch (err) {
+                console.error('autoSyncDrive error', err);
+            }
+        }
+
+        // 自動同期のオン/オフを切り替え
+        function toggleAutoSync() {
+            autoSync = !autoSync;
+            const btn = document.getElementById('driveAutoSyncBtn');
+            if (btn) {
+                btn.textContent = `自動同期: ${autoSync ? 'オン' : 'オフ'}`;
+            }
+            // オンに切り替わった場合は、すぐに同期を実行
+            if (autoSync) {
+                maybeAutoSync();
+            }
+        }
+
         // 画面サイズに基づいてセルサイズを計算
         function calculateCellSize(size) {
             const container = document.getElementById('gameContainer');
@@ -545,6 +642,7 @@
                 showRecords();
                 alert('記録を上書きロードしました');
                 closeLoadModal();
+                maybeAutoSync();
             }
         }
 
@@ -573,6 +671,7 @@
                 showRecords();
                 alert(`マージ完了: 追加 ${added} 件、重複スキップ ${skipped} 件`);
                 closeLoadModal();
+                maybeAutoSync();
             }
         }
 
@@ -592,6 +691,7 @@
             });
             saveRecords();
             renderPlayerNames();
+            maybeAutoSync();
         }
 
         let allowExistingName = false; // ボタンで選択した場合のみ許可されるフラグ
@@ -737,6 +837,7 @@
                 records = [];
                 saveRecords();
                 showRecords();
+                maybeAutoSync();
             }
         }
 
