@@ -367,7 +367,12 @@
 
         // ボタン表示更新
         function updateGoogleDriveButtons() {
-            document.getElementById('driveAuthBtn').style.display = isGoogleDriveAuthorized ? 'none' : 'inline-block';
+            // 認証ボタンは常に表示。ただし認証済みの場合は無効化
+            const authBtn = document.getElementById('driveAuthBtn');
+            if (authBtn) {
+                authBtn.disabled = isGoogleDriveAuthorized;
+                authBtn.textContent = isGoogleDriveAuthorized ? 'Google Drive 認証済み' : 'Google Drive 認証';
+            }
             document.getElementById('driveSaveBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveLoadBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveAutoSyncBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
