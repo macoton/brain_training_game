@@ -367,15 +367,19 @@
 
         // ボタン表示更新
         function updateGoogleDriveButtons() {
-            // 認証ボタンは常に表示。ただし認証済みの場合は無効化
-            const authBtn = document.getElementById('driveAuthBtn');
-            if (authBtn) {
-                authBtn.disabled = isGoogleDriveAuthorized;
-                authBtn.textContent = isGoogleDriveAuthorized ? 'Google Drive 認証済み' : 'Google Drive 認証';
-            }
+            // 認証ボタンは常に表示
             document.getElementById('driveSaveBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveLoadBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
             document.getElementById('driveAutoSyncBtn').style.display = isGoogleDriveAuthorized ? 'inline-block' : 'none';
+            updateAutoSyncButton();
+        }
+
+        // 自動同期ボタンのテキスト更新
+        function updateAutoSyncButton() {
+            const btn = document.getElementById('driveAutoSyncBtn');
+            if (btn) {
+                btn.textContent = `自動同期: ${autoSync ? 'オン' : 'オフ'}`;
+            }
         }
 
         // 認証（トークン取得）
@@ -602,10 +606,8 @@
         // 自動同期のオン/オフを切り替え
         function toggleAutoSync() {
             autoSync = !autoSync;
-            const btn = document.getElementById('driveAutoSyncBtn');
-            if (btn) {
-                btn.textContent = `自動同期: ${autoSync ? 'オン' : 'オフ'}`;
-            }
+            saveAutoSync();
+            updateAutoSyncButton();
             // オンに切り替わった場合は、すぐに同期を実行
             if (autoSync) {
                 maybeAutoSync();
@@ -644,9 +646,23 @@
             renderPlayerNames();
         }
 
+        // 自動同期状態をローカルストレージから読み込む
+        function loadAutoSync() {
+            const saved = localStorage.getItem('autoSync');
+            if (saved !== null) {
+                autoSync = JSON.parse(saved);
+            }
+            updateAutoSyncButton();
+        }
+
         // 記録をローカルストレージに保存
         function saveRecords() {
             localStorage.setItem('gameRecords', JSON.stringify(records));
+        }
+
+        // 自動同期状態をローカルストレージに保存
+        function saveAutoSync() {
+            localStorage.setItem('autoSync', JSON.stringify(autoSync));
         }
 
         // JSONファイルにエクスポート
@@ -917,6 +933,7 @@
         // ページ読み込み時に記録を読み込み、Google API 設定を取得して初期化
         window.addEventListener('DOMContentLoaded', function() {
             loadRecords();
+            loadAutoSync();
             loadConfigFromCGI();
             renderPlayerNames();
             initAdPanelObserver();
