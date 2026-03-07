@@ -354,6 +354,7 @@
                             isGoogleDriveAuthorized = true;
                             updateGoogleDriveButtons();
                             alert('Google Drive に認証しました');
+                            maybeAutoSync();
                         } else {
                             console.error('tokenResponse:', tokenResponse);
                             alert('認証に失敗しました');
